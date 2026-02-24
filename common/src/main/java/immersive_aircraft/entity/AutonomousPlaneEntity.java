@@ -277,7 +277,7 @@ public class AutonomousPlaneEntity extends AirplaneEntity {
         float yawInput = Mth.clamp(yawDiff / 30.0f, -1.0f, 1.0f);
 
         // Apply yaw
-        setYRot(getYRot() - yawSpeed * yawInput);
+        setYRot(getYRot() + yawSpeed * yawInput);
 
         // Calculate pitch difference
         float pitchDiff = targetPitch - getXRot();
