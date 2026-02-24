@@ -31,6 +31,8 @@ public interface Items {
     Supplier<Item> QUADROCOPTER = register("quadrocopter", () -> new AircraftItem(baseProps().stacksTo(1), world -> new QuadrocopterEntity(Entities.QUADROCOPTER.get(), world)));
     Supplier<Item> BAMBOO_HOPPER = register("bamboo_hopper", () -> new AircraftItem(baseProps().stacksTo(1), world -> new BambooHopperEntity(Entities.BAMBOO_HOPPER.get(), world)));
 
+    Supplier<Item> AUTONOMOUS_PLANE = register("autonomous_plane", () -> new AircraftItem(baseProps().stacksTo(1), world -> new AutonomousPlaneEntity(Entities.AUTONOMOUS_PLANE.get(), world)));
+
     Supplier<Item> ROTARY_CANNON = register("rotary_cannon", () -> new WeaponItem(baseProps().stacksTo(1), WeaponMount.Type.ROTATING));
     Supplier<Item> HEAVY_CROSSBOW = register("heavy_crossbow", () -> new WeaponItem(baseProps().stacksTo(1), WeaponMount.Type.FRONT));
     Supplier<Item> TELESCOPE = register("telescope", () -> new WeaponItem(baseProps().stacksTo(1), WeaponMount.Type.ROTATING));

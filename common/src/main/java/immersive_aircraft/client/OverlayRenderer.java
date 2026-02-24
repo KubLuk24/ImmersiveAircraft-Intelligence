@@ -5,6 +5,7 @@ import immersive_aircraft.Main;
 import immersive_aircraft.client.hud.*;
 import immersive_aircraft.config.Config;
 import immersive_aircraft.entity.BiplaneEntity;
+import immersive_aircraft.entity.AutonomousPlaneEntity;
 import immersive_aircraft.entity.EngineVehicle;
 import immersive_aircraft.entity.VehicleEntity;
 import immersive_aircraft.entity.WarshipEntity;
@@ -43,8 +44,8 @@ public class OverlayRenderer {
                             AttitudeIndicator.INSTANCE, VectorIndicator.INSTANCE, WarningIndicator.INSTANCE})
                         i.update(client, aircraft);
                     if (aircraft.getProperties().get(VehicleStat.HUD) == 0
-                            && (aircraft instanceof BiplaneEntity || aircraft instanceof WarshipEntity)
-                    )   // hud currently supports biplane / warship
+                            && (aircraft instanceof BiplaneEntity || aircraft instanceof WarshipEntity || aircraft instanceof AutonomousPlaneEntity)
+                    )   // hud currently supports biplane / warship / autonomous plane
                         INSTANCE.renderAircraftHUD(client, context, tickDelta, barHeightOffset, aircraft);
                     if (aircraft.getProperties().get(VehicleStat.DIALS) == 0)   // dials can be used on any aircraft
                         INSTANCE.renderAircraftDials(client, context, tickDelta, barHeightOffset, aircraft);
