@@ -136,6 +136,9 @@
   "immersive_aircraft.autopilot.apply": "Set Destination",
   "immersive_aircraft.autopilot.status.active": "Autopilot: ACTIVE",
   "immersive_aircraft.autopilot.status.inactive": "Autopilot: INACTIVE",
+  "immersive_aircraft.autopilot.blocked": "Cannot take off: no clear runway!",
+  "immersive_aircraft.autopilot.presets": "Presets:",
+  "immersive_aircraft.autopilot.save": "Save",
 
   "immersive_aircraft.slot.booster": "Boost rockets",
   "immersive_aircraft.slot.weapon": "Weapon slot",

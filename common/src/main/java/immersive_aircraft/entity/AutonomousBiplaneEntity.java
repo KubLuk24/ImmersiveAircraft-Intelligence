@@ -3,29 +3,45 @@ package immersive_aircraft.entity;
 import immersive_aircraft.Items;
 import immersive_aircraft.client.KeyBindings;
 import immersive_aircraft.client.gui.AutopilotScreen;
+import immersive_aircraft.entity.autopilot.DestinationMemory;
+import immersive_aircraft.entity.autopilot.ObstacleAvoidance;
+import immersive_aircraft.entity.autopilot.PathPlanner;
+import immersive_aircraft.entity.autopilot.TakeoffChecker;
+import immersive_aircraft.entity.autopilot.TerrainScanner;
 import immersive_aircraft.item.upgrade.VehicleStat;
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Vector3f;
 
 /**
  * An autonomous biplane that can fly itself to a destination using autopilot.
- * The player crafts it with a biplane and an eye of ender.
- * When autopilot is engaged and a player is seated, it flies to the target coordinates,
- * avoids obstacles, and circles the destination upon arrival.
+ *
+ * The autopilot uses a modular navigation system:
+ * - {@link TerrainScanner}: scans terrain in multiple directions each tick
+ * - {@link ObstacleAvoidance}: decides whether to climb over or steer around obstacles
+ * - {@link PathPlanner}: computes target yaw/pitch/throttle combining destination and avoidance
+ * - {@link TakeoffChecker}: verifies runway clearance before engaging autopilot
+ * - {@link DestinationMemory}: stores up to 5 preset destinations
+ *
+ * The key improvement: instead of blindly pitching up when an obstacle is
+ * detected ahead, the system checks whether the plane's engine is powerful
+ * enough to actually climb over the terrain. If not, it steers around it.
  */
 public class AutonomousBiplaneEntity extends BiplaneEntity {
+    // --- Synched entity data (shared between server and client) ---
     private static final EntityDataAccessor<Boolean> AUTOPILOT_ENABLED =
             SynchedEntityData.defineId(AutonomousBiplaneEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Integer> DEST_X =
@@ -35,17 +51,27 @@ public class AutonomousBiplaneEntity extends BiplaneEntity {
     private static final EntityDataAccessor<Integer> DEST_Z =
             SynchedEntityData.defineId(AutonomousBiplaneEntity.class, EntityDataSerializers.INT);
 
-    private static final double ARRIVAL_RADIUS = 20.0;
-    private static final double CIRCLE_RADIUS = 30.0;
-    private static final double CRUISE_ALTITUDE_OFFSET = 15.0;
-    private static final double OBSTACLE_CHECK_DISTANCE = 12.0;
+    // How often to run the full terrain scan (every N ticks).
+    // Scanning every tick would be expensive; every 5 ticks is responsive enough.
+    private static final int SCAN_INTERVAL = 5;
 
-    private float circleAngle = 0.0f;
-    private boolean isCircling = false;
+    // --- Modular autopilot subsystems ---
+    private final TerrainScanner terrainScanner = new TerrainScanner();
+    private final ObstacleAvoidance obstacleAvoidance = new ObstacleAvoidance();
+    private final PathPlanner pathPlanner = new PathPlanner();
+    private final TakeoffChecker takeoffChecker = new TakeoffChecker();
+    private final DestinationMemory destinationMemory = new DestinationMemory();
+
+    // Tick counter for throttling expensive scans
+    private int scanTickCounter = 0;
 
     public AutonomousBiplaneEntity(EntityType<? extends AircraftEntity> entityType, Level world) {
         super(entityType, world);
     }
+
+    // =========================================================================
+    // Synched data & basic getters/setters
+    // =========================================================================
 
     @Override
     protected void defineSynchedData() {
@@ -63,33 +89,63 @@ public class AutonomousBiplaneEntity extends BiplaneEntity {
     public void setAutopilotEnabled(boolean enabled) {
         entityData.set(AUTOPILOT_ENABLED, enabled);
         if (!enabled) {
-            isCircling = false;
+            pathPlanner.reset();
         }
     }
 
-    public int getDestX() {
-        return entityData.get(DEST_X);
-    }
-
-    public int getDestY() {
-        return entityData.get(DEST_Y);
-    }
-
-    public int getDestZ() {
-        return entityData.get(DEST_Z);
-    }
+    public int getDestX() { return entityData.get(DEST_X); }
+    public int getDestY() { return entityData.get(DEST_Y); }
+    public int getDestZ() { return entityData.get(DEST_Z); }
 
     public void setDestination(int x, int y, int z) {
         entityData.set(DEST_X, x);
         entityData.set(DEST_Y, y);
         entityData.set(DEST_Z, z);
-        isCircling = false;
+        pathPlanner.reset();
+    }
+
+    /** Access the destination memory for preset save/load. */
+    public DestinationMemory getDestinationMemory() {
+        return destinationMemory;
     }
 
     @Override
     public Item asItem() {
         return Items.AUTONOMOUS_BIPLANE.get();
     }
+
+    // =========================================================================
+    // Takeoff check
+    // =========================================================================
+
+    /**
+     * Attempts to enable autopilot. If the aircraft is on the ground, first
+     * checks that there is a clear runway to take off from.
+     *
+     * @return true if autopilot was successfully enabled
+     */
+    public boolean tryEnableAutopilot() {
+        if (!level().isClientSide && onGround()) {
+            TakeoffChecker.TakeoffResult result = takeoffChecker.check(level(), position());
+            if (!result.canTakeOff()) {
+                // Notify the pilot that takeoff is blocked
+                if (!getPassengers().isEmpty()
+                        && getPassengers().get(0) instanceof ServerPlayer player) {
+                    player.displayClientMessage(
+                            Component.translatable("immersive_aircraft.autopilot.blocked"), true);
+                }
+                return false;
+            }
+            // Orient the aircraft toward the best takeoff direction
+            setYRot(result.bestYaw());
+        }
+        setAutopilotEnabled(true);
+        return true;
+    }
+
+    // =========================================================================
+    // Tick & controller
+    // =========================================================================
 
     @Override
     public void tick() {
@@ -104,6 +160,7 @@ public class AutonomousBiplaneEntity extends BiplaneEntity {
 
         super.tick();
 
+        // Client-side: open autopilot screen when keybind is pressed
         if (level().isClientSide) {
             for (var entity : getPassengers()) {
                 if (entity instanceof Player player && player.isLocalPlayer()) {
@@ -125,9 +182,7 @@ public class AutonomousBiplaneEntity extends BiplaneEntity {
                 && getPassengers().get(0) instanceof Player;
 
         if (isAutopilotEnabled() && hasPlayerPilot) {
-            // Bypass the normal interpolated input system entirely.
-            // Directly apply yaw, pitch, and thrust to avoid interpolation lag
-            // which causes oscillation/wobble.
+            // Use the modular autopilot system instead of manual controls
             updateAutopilotController();
             return;
         }
@@ -136,72 +191,46 @@ public class AutonomousBiplaneEntity extends BiplaneEntity {
         super.updateController();
     }
 
+    // =========================================================================
+    // Autopilot controller (the brain)
+    // =========================================================================
+
     /**
-     * Directly controls yaw, pitch, engine throttle, and thrust.
-     * Bypasses the interpolated input pipeline (pressingInterpolatedX/Z)
-     * to avoid the smoothing lag that causes oscillation.
+     * Main autopilot control loop. Runs every tick when autopilot is engaged.
+     *
+     * Flow:
+     * 1. Periodically scan terrain (every SCAN_INTERVAL ticks)
+     * 2. Evaluate obstacle avoidance based on scan results
+     * 3. Plan the flight path (target yaw, pitch, throttle)
+     * 4. Apply flight controls (yaw, pitch, engine, thrust)
      */
     private void updateAutopilotController() {
-        Vec3 dest = new Vec3(getDestX() + 0.5, getDestY(), getDestZ() + 0.5);
         Vec3 pos = position();
 
-        double horizontalDist = Math.sqrt(
-                (dest.x - pos.x) * (dest.x - pos.x) + (dest.z - pos.z) * (dest.z - pos.z)
-        );
-
-        float targetYaw;
-        float targetPitch;
-        float targetThrottle;
-
-        if (horizontalDist < ARRIVAL_RADIUS) {
-            isCircling = true;
+        // --- Step 1: Terrain scanning (throttled to reduce CPU cost) ---
+        scanTickCounter++;
+        if (scanTickCounter >= SCAN_INTERVAL) {
+            scanTickCounter = 0;
+            terrainScanner.scan(level(), pos, getYRot());
+            obstacleAvoidance.evaluate(terrainScanner, pos, getProperties(), getYRot());
         }
 
-        if (isCircling) {
-            circleAngle += 1.5f;
-            if (circleAngle >= 360.0f) circleAngle -= 360.0f;
+        // --- Step 2: Plan the flight path ---
+        pathPlanner.plan(pos, getDestX(), getDestY(), getDestZ(),
+                getYRot(), terrainScanner, obstacleAvoidance);
 
-            double circleX = dest.x + Math.sin(Math.toRadians(circleAngle)) * CIRCLE_RADIUS;
-            double circleZ = dest.z + Math.cos(Math.toRadians(circleAngle)) * CIRCLE_RADIUS;
-            double circleY = dest.y + CRUISE_ALTITUDE_OFFSET;
+        float targetYaw = pathPlanner.getTargetYaw();
+        float targetPitch = pathPlanner.getTargetPitch();
+        float targetThrottle = pathPlanner.getTargetThrottle();
 
-            double dx = circleX - pos.x;
-            double dz = circleZ - pos.z;
-            double dy = circleY - pos.y;
-
-            targetYaw = (float) (-Math.toDegrees(Math.atan2(dx, dz)));
-            double circleHDist = Math.sqrt(dx * dx + dz * dz);
-            targetPitch = (float) (-Math.toDegrees(Math.atan2(dy, circleHDist)));
-            targetThrottle = 0.7f;
-        } else {
-            double targetAltitude = Math.max(dest.y + CRUISE_ALTITUDE_OFFSET, pos.y);
-            if (horizontalDist > 50) {
-                targetAltitude = Math.max(dest.y + CRUISE_ALTITUDE_OFFSET, getDesiredCruiseAltitude());
-            }
-
-            double dx = dest.x - pos.x;
-            double dz = dest.z - pos.z;
-            double dy = targetAltitude - pos.y;
-
-            targetYaw = (float) (-Math.toDegrees(Math.atan2(dx, dz)));
-            targetPitch = (float) (-Math.toDegrees(Math.atan2(dy, horizontalDist)));
-            targetThrottle = 1.0f;
-        }
-
-        if (shouldAvoidObstacle()) {
-            targetPitch = -20.0f;
-            targetThrottle = 1.0f;
-        }
-
-        // --- Direct yaw control (proportional, rate-limited) ---
+        // --- Step 3: Apply yaw control (proportional, rate-limited) ---
         float yawDiff = normalizeAngle(targetYaw - getYRot());
         float maxYawRate = getProperties().get(VehicleStat.YAW_SPEED);
-        // Proportional gain: turn faster when far from target, slower when close
         float yawChange = yawDiff * 0.1f;
         yawChange = Math.max(-maxYawRate, Math.min(maxYawRate, yawChange));
         setYRot(getYRot() + yawChange);
 
-        // --- Direct pitch control (proportional, rate-limited) ---
+        // --- Step 4: Apply pitch control (proportional, rate-limited) ---
         float pitchDiff = normalizeAngle(targetPitch - getXRot());
         float maxPitchRate = getProperties().get(VehicleStat.PITCH_SPEED);
         float pitchChange = pitchDiff * 0.1f;
@@ -212,69 +241,33 @@ public class AutonomousBiplaneEntity extends BiplaneEntity {
         // Apply stabilizer dampening (same as AircraftEntity)
         setXRot(getXRot() * (1.0f - getProperties().getAdditive(VehicleStat.STABILIZER)));
 
-        // --- Engine throttle ---
+        // --- Step 5: Engine throttle ---
         setEngineTarget(targetThrottle);
 
-        // --- Thrust (replicates AirplaneEntity physics) ---
+        // --- Step 6: Thrust (replicates AirplaneEntity physics) ---
         Vector3f direction = getForwardDirection();
         float thrust = (float) (Math.pow(getEnginePower(), 2.0) * getProperties().get(VehicleStat.ENGINE_SPEED));
         if (onGround() && getEngineTarget() < 1.0) {
-            // Low-speed ground taxi: use push speed scaled by forward input
             thrust = getProperties().get(VehicleStat.PUSH_SPEED)
                     / (1.0f + (float) getDeltaMovement().length() * 5.0f)
                     * (1.0f - getEnginePower());
         }
         setDeltaMovement(getDeltaMovement().add(toVec3d(direction.mul(thrust))));
 
-        // Set inputs to zero so the visual interpolation stays neutral
-        // (no phantom control surface deflections from stale values)
+        // Zero out manual inputs so visual interpolation stays neutral
         setInputs(0, 0, 0);
     }
 
-    private double getDesiredCruiseAltitude() {
-        int groundHeight = getGroundHeightBelow();
-        return Math.max(groundHeight + CRUISE_ALTITUDE_OFFSET + 10, getY());
-    }
-
-    private int getGroundHeightBelow() {
-        BlockPos.MutableBlockPos probe = new BlockPos.MutableBlockPos(
-                (int) getX(), (int) getY(), (int) getZ()
-        );
-        for (int y = (int) getY(); y > level().getMinBuildHeight(); y--) {
-            probe.setY(y);
-            BlockState state = level().getBlockState(probe);
-            if (!state.isAir() && state.getFluidState().isEmpty()) {
-                return y;
-            }
-        }
-        return level().getMinBuildHeight();
-    }
-
-    private boolean shouldAvoidObstacle() {
-        Vector3f forward = getForwardDirection();
-        Vec3 pos = position();
-
-        for (double dist = 2.0; dist <= OBSTACLE_CHECK_DISTANCE; dist += 2.0) {
-            double checkX = pos.x + forward.x() * dist;
-            double checkY = pos.y + forward.y() * dist;
-            double checkZ = pos.z + forward.z() * dist;
-
-            for (int dy = -1; dy <= 1; dy++) {
-                BlockPos blockPos = new BlockPos((int) checkX, (int) (checkY + dy), (int) checkZ);
-                BlockState state = level().getBlockState(blockPos);
-                if (!state.isAir() && state.getFluidState().isEmpty()) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
+    /** Normalize an angle to the range [-180, 180]. */
     private static float normalizeAngle(float angle) {
         while (angle > 180.0f) angle -= 360.0f;
         while (angle < -180.0f) angle += 360.0f;
         return angle;
     }
+
+    // =========================================================================
+    // NBT save/load
+    // =========================================================================
 
     @Override
     protected void addAdditionalSaveData(@NotNull CompoundTag tag) {
@@ -283,8 +276,11 @@ public class AutonomousBiplaneEntity extends BiplaneEntity {
         tag.putInt("DestX", getDestX());
         tag.putInt("DestY", getDestY());
         tag.putInt("DestZ", getDestZ());
-        tag.putFloat("CircleAngle", circleAngle);
-        tag.putBoolean("IsCircling", isCircling);
+        tag.putFloat("CircleAngle", pathPlanner.getCircleAngle());
+        tag.putString("FlightPhase", pathPlanner.getPhase().name());
+
+        // Save destination presets
+        tag.put("DestinationPresets", destinationMemory.toNbt());
     }
 
     @Override
@@ -297,10 +293,12 @@ public class AutonomousBiplaneEntity extends BiplaneEntity {
             setDestination(tag.getInt("DestX"), tag.getInt("DestY"), tag.getInt("DestZ"));
         }
         if (tag.contains("CircleAngle")) {
-            circleAngle = tag.getFloat("CircleAngle");
+            pathPlanner.setCircleAngle(tag.getFloat("CircleAngle"));
         }
-        if (tag.contains("IsCircling")) {
-            isCircling = tag.getBoolean("IsCircling");
+
+        // Load destination presets
+        if (tag.contains("DestinationPresets", Tag.TAG_LIST)) {
+            destinationMemory.fromNbt(tag.getList("DestinationPresets", Tag.TAG_COMPOUND));
         }
     }
 }
