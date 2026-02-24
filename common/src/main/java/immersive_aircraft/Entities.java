@@ -20,6 +20,13 @@ public interface Entities {
             .fireImmune()
     );
 
+    Supplier<EntityType<AutonomousBiplaneEntity>> AUTONOMOUS_BIPLANE = register("autonomous_biplane", EntityType.Builder
+            .of(AutonomousBiplaneEntity::new, MobCategory.MISC)
+            .sized(1.75f, 0.85f)
+            .clientTrackingRange(12)
+            .fireImmune()
+    );
+
     Supplier<EntityType<BiplaneEntity>> BIPLANE = register("biplane", EntityType.Builder
             .of(BiplaneEntity::new, MobCategory.MISC)
             .sized(1.75f, 0.85f)
