@@ -62,6 +62,13 @@ public interface Entities {
             .fireImmune()
     );
 
+    Supplier<EntityType<IntelligentBiplaneEntity>> INTELLIGENT_BIPLANE = register("intelligent_biplane", EntityType.Builder
+            .of(IntelligentBiplaneEntity::new, MobCategory.MISC)
+            .sized(1.75f, 0.85f)
+            .clientTrackingRange(12)
+            .fireImmune()
+    );
+
     Supplier<EntityType<BulletEntity>> BULLET = register("bullet", EntityType.Builder
             .of(BulletEntity::new, MobCategory.MISC)
             .sized(0.25f, 0.25f)
