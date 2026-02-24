@@ -258,6 +258,8 @@ public class AutonomousBiplaneEntity extends BiplaneEntity {
         tag.putInt("DestX", getDestX());
         tag.putInt("DestY", getDestY());
         tag.putInt("DestZ", getDestZ());
+        tag.putFloat("CircleAngle", circleAngle);
+        tag.putBoolean("IsCircling", isCircling);
     }
 
     @Override
@@ -268,6 +270,12 @@ public class AutonomousBiplaneEntity extends BiplaneEntity {
         }
         if (tag.contains("DestX")) {
             setDestination(tag.getInt("DestX"), tag.getInt("DestY"), tag.getInt("DestZ"));
+        }
+        if (tag.contains("CircleAngle")) {
+            circleAngle = tag.getFloat("CircleAngle");
+        }
+        if (tag.contains("IsCircling")) {
+            isCircling = tag.getBoolean("IsCircling");
         }
     }
 }

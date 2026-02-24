@@ -53,23 +53,19 @@ public class AutopilotScreen extends Screen {
         // Toggle autopilot button
         toggleButton = Button.builder(getToggleText(), button -> {
             boolean newState = !vehicle.isAutopilotEnabled();
-            int destX = parseCoord(xField.getValue(), vehicle.getDestX());
-            int destY = parseCoord(yField.getValue(), vehicle.getDestY());
-            int destZ = parseCoord(zField.getValue(), vehicle.getDestZ());
-            NetworkHandler.sendToServer(new AutopilotMessage(newState, destX, destY, destZ));
-            vehicle.setDestination(destX, destY, destZ);
+            applyDestination();
             vehicle.setAutopilotEnabled(newState);
+            NetworkHandler.sendToServer(new AutopilotMessage(newState,
+                    vehicle.getDestX(), vehicle.getDestY(), vehicle.getDestZ()));
             updateToggleButton();
         }).bounds(centerX - 75, centerY + 10, 150, 20).build();
         this.addRenderableWidget(toggleButton);
 
         // Apply button (set coordinates without changing autopilot state)
         Button applyButton = Button.builder(Component.translatable("immersive_aircraft.autopilot.apply"), button -> {
-            int destX = parseCoord(xField.getValue(), vehicle.getDestX());
-            int destY = parseCoord(yField.getValue(), vehicle.getDestY());
-            int destZ = parseCoord(zField.getValue(), vehicle.getDestZ());
-            NetworkHandler.sendToServer(new AutopilotMessage(vehicle.isAutopilotEnabled(), destX, destY, destZ));
-            vehicle.setDestination(destX, destY, destZ);
+            applyDestination();
+            NetworkHandler.sendToServer(new AutopilotMessage(vehicle.isAutopilotEnabled(),
+                    vehicle.getDestX(), vehicle.getDestY(), vehicle.getDestZ()));
         }).bounds(centerX - 75, centerY + 35, 150, 20).build();
         this.addRenderableWidget(applyButton);
     }
@@ -82,6 +78,13 @@ public class AutopilotScreen extends Screen {
 
     private void updateToggleButton() {
         toggleButton.setMessage(getToggleText());
+    }
+
+    private void applyDestination() {
+        int destX = parseCoord(xField.getValue(), vehicle.getDestX());
+        int destY = parseCoord(yField.getValue(), vehicle.getDestY());
+        int destZ = parseCoord(zField.getValue(), vehicle.getDestZ());
+        vehicle.setDestination(destX, destY, destZ);
     }
 
     @Override
