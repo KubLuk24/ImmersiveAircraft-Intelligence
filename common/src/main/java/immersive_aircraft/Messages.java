@@ -16,5 +16,6 @@ public class Messages {
         NetworkHandler.registerMessage(AircraftDataMessage.class, AircraftDataMessage::new);
         NetworkHandler.registerMessage(FireMessage.class, FireMessage::new);
         NetworkHandler.registerMessage(FireResponse.class, FireResponse::new);
+        NetworkHandler.registerMessage(UpdateAutopilotMessage.class, UpdateAutopilotMessage::new);
     }
 }

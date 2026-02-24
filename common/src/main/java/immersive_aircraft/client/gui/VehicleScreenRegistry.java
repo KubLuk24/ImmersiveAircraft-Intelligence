@@ -1,5 +1,6 @@
 package immersive_aircraft.client.gui;
 
+import immersive_aircraft.entity.AutonomousBiplaneEntity;
 import immersive_aircraft.entity.InventoryVehicleEntity;
 import immersive_aircraft.network.s2c.OpenGuiRequest;
 import immersive_aircraft.screen.VehicleScreenHandler;
@@ -28,6 +29,15 @@ public class VehicleScreenRegistry {
     static {
         // Example of registering a custom handler
         GUI_OPEN_HANDLERS.put(InventoryVehicleEntity.class, DEFAULT);
+        GUI_OPEN_HANDLERS.put(AutonomousBiplaneEntity.class, (vehicle, player, message) -> {
+            Minecraft client = Minecraft.getInstance();
+            if (client.level != null && client.player != null) {
+                VehicleScreenHandler handler = (VehicleScreenHandler) vehicle.createMenu(message.getSyncId(), client.player.getInventory(), client.player);
+                AutonomousBiplaneScreen screen = new AutonomousBiplaneScreen(handler, client.player.getInventory(), vehicle.getDisplayName());
+                client.player.containerMenu = screen.getMenu();
+                client.setScreen(screen);
+            }
+        });
     }
 
     public interface OpenGuiRequestHandler {
