@@ -71,7 +71,7 @@ public class PathPlanner {
         if (phase == FlightPhase.CIRCLING) {
             planCircling(pos, dest);
         } else {
-            planCruise(pos, dest, horizontalDist, scanner, avoidance);
+            planCruise(pos, dest, horizontalDist, currentYaw, scanner, avoidance);
         }
     }
 
@@ -104,6 +104,7 @@ public class PathPlanner {
      * corrections.
      */
     private void planCruise(Vec3 pos, Vec3 dest, double horizontalDist,
+                            float currentYaw,
                             TerrainScanner scanner, ObstacleAvoidance avoidance) {
         // --- Step 1: Compute the safe cruise altitude ---
         // Base: fly at destination altitude + offset, or current altitude if higher
@@ -155,18 +156,18 @@ public class PathPlanner {
 
             case STEER_LEFT:
             case STEER_RIGHT:
-                // Obstacle too tall to climb - steer around it
-                // Apply yaw offset to current heading (not destination heading)
-                // so we actually turn away from the mountain
-                targetYaw = idealYaw + avoidance.getSteerYawOffset();
+                // Obstacle too tall to climb - steer around it.
+                // Apply yaw offset to CURRENT heading so we actually turn away
+                // from the mountain, not toward the destination through it.
+                targetYaw = currentYaw + avoidance.getSteerYawOffset();
                 targetPitch = avoidance.getClimbPitch();  // mild climb while steering
                 targetThrottle = 1.0f;
                 phase = FlightPhase.AVOIDING;
                 break;
 
             case EMERGENCY_TURN:
-                // Very close obstacle - hard turn + climb
-                targetYaw = idealYaw + avoidance.getSteerYawOffset();
+                // Very close obstacle - hard turn away from current heading + climb
+                targetYaw = currentYaw + avoidance.getSteerYawOffset();
                 targetPitch = avoidance.getClimbPitch();
                 targetThrottle = 1.0f;
                 phase = FlightPhase.AVOIDING;

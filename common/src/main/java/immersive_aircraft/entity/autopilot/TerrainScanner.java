@@ -49,7 +49,8 @@ public class TerrainScanner {
      * @param yawDeg   current aircraft yaw in degrees
      */
     public void scan(Level level, Vec3 pos, float yawDeg) {
-        // Convert yaw to radians; Minecraft yaw: 0 = south (+Z), 90 = west (-X)
+        // Negate yaw to convert from Minecraft's left-handed rotation convention
+        // to standard right-handed trigonometry (Minecraft: 0=south, 90=west)
         double yawRad = Math.toRadians(-yawDeg);
         double forwardX = Math.sin(yawRad);
         double forwardZ = Math.cos(yawRad);
