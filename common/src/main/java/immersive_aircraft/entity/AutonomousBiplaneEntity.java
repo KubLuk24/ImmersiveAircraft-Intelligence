@@ -3,6 +3,7 @@ package immersive_aircraft.entity;
 import immersive_aircraft.Items;
 import immersive_aircraft.client.KeyBindings;
 import immersive_aircraft.client.gui.AutopilotScreen;
+import immersive_aircraft.item.upgrade.VehicleStat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -124,14 +125,23 @@ public class AutonomousBiplaneEntity extends BiplaneEntity {
                 && getPassengers().get(0) instanceof Player;
 
         if (isAutopilotEnabled() && hasPlayerPilot) {
-            computeAndApplyAutopilotInputs();
+            // Bypass the normal interpolated input system entirely.
+            // Directly apply yaw, pitch, and thrust to avoid interpolation lag
+            // which causes oscillation/wobble.
+            updateAutopilotController();
+            return;
         }
 
-        // Always call super to apply the standard flight physics
+        // Normal player-driven controls
         super.updateController();
     }
 
-    private void computeAndApplyAutopilotInputs() {
+    /**
+     * Directly controls yaw, pitch, engine throttle, and thrust.
+     * Bypasses the interpolated input pipeline (pressingInterpolatedX/Z)
+     * to avoid the smoothing lag that causes oscillation.
+     */
+    private void updateAutopilotController() {
         Vec3 dest = new Vec3(getDestX() + 0.5, getDestY(), getDestZ() + 0.5);
         Vec3 pos = position();
 
@@ -183,27 +193,42 @@ public class AutonomousBiplaneEntity extends BiplaneEntity {
             targetThrottle = 1.0f;
         }
 
-        // Calculate steering inputs
+        // --- Direct yaw control (proportional, rate-limited) ---
         float yawDiff = normalizeAngle(targetYaw - getYRot());
-        float yawInput = 0.0f;
-        if (Math.abs(yawDiff) > 1.0f) {
-            yawInput = Math.max(-1.0f, Math.min(1.0f, yawDiff / 30.0f));
-        }
+        float maxYawRate = getProperties().get(VehicleStat.YAW_SPEED);
+        // Proportional gain: turn faster when far from target, slower when close
+        float yawChange = yawDiff * 0.1f;
+        yawChange = Math.max(-maxYawRate, Math.min(maxYawRate, yawChange));
+        setYRot(getYRot() + yawChange);
 
+        // --- Direct pitch control (proportional, rate-limited) ---
         float pitchDiff = normalizeAngle(targetPitch - getXRot());
-        float pitchInput = 0.0f;
-        if (Math.abs(pitchDiff) > 0.5f) {
-            pitchInput = Math.max(-1.0f, Math.min(1.0f, pitchDiff / 20.0f));
+        float maxPitchRate = getProperties().get(VehicleStat.PITCH_SPEED);
+        float pitchChange = pitchDiff * 0.1f;
+        pitchChange = Math.max(-maxPitchRate, Math.min(maxPitchRate, pitchChange));
+        if (!onGround()) {
+            setXRot(getXRot() + pitchChange);
         }
+        // Apply stabilizer dampening (same as AircraftEntity)
+        setXRot(getXRot() * (1.0f - getProperties().getAdditive(VehicleStat.STABILIZER)));
 
-        // Set inputs so the parent's updateController applies them via standard physics
-        setInputs(yawInput, 0, pitchInput);
+        // --- Engine throttle ---
+        setEngineTarget(targetThrottle);
 
-        // Set the engine throttle directly
-        float currentTarget = getEngineTarget();
-        if (Math.abs(currentTarget - targetThrottle) > 0.01f) {
-            setEngineTarget(targetThrottle);
+        // --- Thrust (replicates AirplaneEntity physics) ---
+        Vector3f direction = getForwardDirection();
+        float thrust = (float) (Math.pow(getEnginePower(), 2.0) * getProperties().get(VehicleStat.ENGINE_SPEED));
+        if (onGround() && getEngineTarget() < 1.0) {
+            // Low-speed ground taxi: use push speed scaled by forward input
+            thrust = getProperties().get(VehicleStat.PUSH_SPEED)
+                    / (1.0f + (float) getDeltaMovement().length() * 5.0f)
+                    * (1.0f - getEnginePower());
         }
+        setDeltaMovement(getDeltaMovement().add(toVec3d(direction.mul(thrust))));
+
+        // Set inputs to zero so the visual interpolation stays neutral
+        // (no phantom control surface deflections from stale values)
+        setInputs(0, 0, 0);
     }
 
     private double getDesiredCruiseAltitude() {
