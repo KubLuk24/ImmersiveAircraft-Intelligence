@@ -16,6 +16,7 @@ public class KeyBindings {
 
     public static final KeyMapping left, right, forward, backward, up, down, pull, push;
     public static final KeyMapping dismount, boost, use;
+    public static final KeyMapping autopilot;
 
     static {
         if (Config.getInstance().useCustomKeybindSystem && Main.MOD_LOADER.equals("fabric")) {
@@ -46,6 +47,7 @@ public class KeyBindings {
 
         dismount = newKey("dismount", GLFW.GLFW_KEY_R);
         boost = newKey("boost", GLFW.GLFW_KEY_B);
+        autopilot = newKey("autopilot", GLFW.GLFW_KEY_G);
     }
 
     private static KeyMapping newFallbackKey(String name, Supplier<KeyMapping> fallback) {

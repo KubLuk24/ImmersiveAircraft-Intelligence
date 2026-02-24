@@ -23,11 +23,13 @@
 
   "key.immersive_aircraft.dismount": "Dismount",
   "key.immersive_aircraft.boost": "Rocket boost",
+  "key.immersive_aircraft.autopilot": "Open Autopilot",
 
   "entity.immersive_aircraft.airship": "Airship",
   "entity.immersive_aircraft.cargo_airship": "Cargo Airship",
   "entity.immersive_aircraft.warship": "Warship",
   "entity.immersive_aircraft.biplane": "Biplane",
+  "entity.immersive_aircraft.autonomous_biplane": "Autonomous Biplane",
   "entity.immersive_aircraft.gyrodyne": "Gyrodyne",
   "entity.immersive_aircraft.quadrocopter": "Quadrocopter",
   "entity.immersive_aircraft.bamboo_hopper": "Bamboo Hopper",
@@ -67,6 +69,7 @@
   "item.immersive_aircraft.cargo_airship": "Cargo Airship",
   "item.immersive_aircraft.warship": "Warship",
   "item.immersive_aircraft.biplane": "Biplane",
+  "item.immersive_aircraft.autonomous_biplane": "Autonomous Biplane",
   "item.immersive_aircraft.gyrodyne": "Gyrodyne",
   "item.immersive_aircraft.quadrocopter": "Quadrocopter",
   "item.immersive_aircraft.bamboo_hopper": "Bamboo Hopper",
@@ -75,6 +78,7 @@
   "item.immersive_aircraft.cargo_airship.description": "Slow and fuel hungry but carries an entire storage.",
   "item.immersive_aircraft.warship.description": "A flying fortress, slow but heavily armed.",
   "item.immersive_aircraft.biplane.description": "Fast and rather reliable. Make sure your runway is long enough.",
+  "item.immersive_aircraft.autonomous_biplane.description": "An intelligent biplane with autopilot capabilities. Set coordinates and let it fly!",
   "item.immersive_aircraft.gyrodyne.description": "Muscle-powered copter. Give it a good push and off it flies!",
   "item.immersive_aircraft.quadrocopter.description": "Perfect for building, and that's about it.",
   "item.immersive_aircraft.bamboo_hopper.description": "A chonky aircraft with three seats and pontoons to land safely on water.",
@@ -125,6 +129,13 @@
 
   "immersive_aircraft.tooltip.no_target": "Needs to be assembled on the floor!",
   "immersive_aircraft.tooltip.no_space": "Not enough space!",
+
+  "immersive_aircraft.autopilot.title": "Autopilot",
+  "immersive_aircraft.autopilot.enable": "Enable Autopilot",
+  "immersive_aircraft.autopilot.disable": "Disable Autopilot",
+  "immersive_aircraft.autopilot.apply": "Set Destination",
+  "immersive_aircraft.autopilot.status.active": "Autopilot: ACTIVE",
+  "immersive_aircraft.autopilot.status.inactive": "Autopilot: INACTIVE",
 
   "immersive_aircraft.slot.booster": "Boost rockets",
   "immersive_aircraft.slot.weapon": "Weapon slot",

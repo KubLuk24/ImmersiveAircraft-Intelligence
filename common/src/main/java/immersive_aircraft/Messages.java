@@ -8,6 +8,7 @@ public class Messages {
     public static void loadMessages() {
         NetworkHandler.registerMessage(EnginePowerMessage.class, EnginePowerMessage::new);
         NetworkHandler.registerMessage(CommandMessage.class, CommandMessage::new);
+        NetworkHandler.registerMessage(AutopilotMessage.class, AutopilotMessage::new);
         NetworkHandler.registerMessage(OpenGuiRequest.class, OpenGuiRequest::new);
         NetworkHandler.registerMessage(InventoryUpdateMessage.class, InventoryUpdateMessage::new);
         NetworkHandler.registerMessage(RequestInventory.class, RequestInventory::new);
