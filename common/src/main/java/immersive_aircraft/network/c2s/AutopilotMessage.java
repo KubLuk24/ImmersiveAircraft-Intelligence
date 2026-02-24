@@ -1,5 +1,6 @@
 package immersive_aircraft.network.c2s;
 
+import immersive_aircraft.Main;
 import immersive_aircraft.cobalt.network.Message;
 import immersive_aircraft.entity.AutonomousBiplaneEntity;
 import net.minecraft.network.FriendlyByteBuf;
@@ -72,9 +73,7 @@ public class AutopilotMessage extends Message {
                         vehicle.savePreset(presetSlot, destX, destY, destZ);
                     }
                 }
-                default -> {
-                    // Unknown action, ignore
-                }
+                default -> Main.LOGGER.warn("Unknown autopilot action: {}", action);
             }
         }
     }
