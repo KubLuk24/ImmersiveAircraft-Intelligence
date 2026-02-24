@@ -1,6 +1,7 @@
 package immersive_aircraft.entity;
 
 import immersive_aircraft.Items;
+import immersive_aircraft.item.upgrade.VehicleStat;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -214,9 +215,6 @@ public class IntelligentBiplaneEntity extends BiplaneEntity {
         float pitchAdjust = Math.max(-2.0f, Math.min(2.0f, pitchDiff * 0.1f));
         setXRot(currentPitch + pitchAdjust);
 
-        // Stabilize roll
-        setXRot(getXRot() * 0.98f);
-
         // Apply thrust
         applyAutopilotThrust();
     }
@@ -270,8 +268,6 @@ public class IntelligentBiplaneEntity extends BiplaneEntity {
         float pitchAdjust = Math.max(-2.0f, Math.min(2.0f, pitchDiff * 0.1f));
         setXRot(currentPitch + pitchAdjust);
 
-        setXRot(getXRot() * 0.98f);
-
         applyAutopilotThrust();
     }
 
@@ -280,7 +276,7 @@ public class IntelligentBiplaneEntity extends BiplaneEntity {
      */
     private void applyAutopilotThrust() {
         Vector3f direction = getForwardDirection();
-        float thrust = (float) (Math.pow(getEnginePower(), 2.0) * getProperties().get(immersive_aircraft.item.upgrade.VehicleStat.ENGINE_SPEED));
+        float thrust = (float) (Math.pow(getEnginePower(), 2.0) * getProperties().get(VehicleStat.ENGINE_SPEED));
         setDeltaMovement(getDeltaMovement().add(toVec3d(direction.mul(thrust))));
     }
 
