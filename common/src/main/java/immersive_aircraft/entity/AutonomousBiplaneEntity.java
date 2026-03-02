@@ -1,10 +1,8 @@
 package immersive_aircraft.entity;
 
 import immersive_aircraft.Items;
-import immersive_aircraft.client.KeyBindings;
-import immersive_aircraft.client.gui.AutopilotScreen;
+import immersive_aircraft.client.AutonomousBiplaneClientHelper;
 import immersive_aircraft.item.upgrade.VehicleStat;
-import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -189,13 +187,7 @@ public class AutonomousBiplaneEntity extends BiplaneEntity {
         super.tick();
 
         if (level().isClientSide) {
-            for (var entity : getPassengers()) {
-                if (entity instanceof Player player && player.isLocalPlayer()) {
-                    if (KeyBindings.autopilot.consumeClick()) {
-                        Minecraft.getInstance().setScreen(new AutopilotScreen(this));
-                    }
-                }
-            }
+            AutonomousBiplaneClientHelper.handleTick(this);
         }
     }
 
